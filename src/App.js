@@ -1,99 +1,203 @@
 import React, { useState } from "react";
-// import "./styles.css";
+import { DragDropContext, Draggable, Droppable } from "react-beautiful-dnd";
+import { v4 as uuid } from "uuid";
 
-const initialTasks = {
-  doing: [
-    { id: 1, title: "Task 1" },
-    { id: 2, title: "Task 2" },
-    { id: 3, title: "Task 3" }
-  ],
-  done: [
-    { id: 4, title: "Task 4" },
-    { id: 5, title: "Task 5" }
-  ]
+const itemsFromBackend = [
+  { id: uuid(), content: "First task" },
+  { id: uuid(), content: "Second task" },
+  { id: uuid(), content: "Third task" },
+  { id: uuid(), content: "Fourth task" },
+  { id: uuid(), content: "Fifth task" },
+];
+
+const columnsFromBackend = {
+  [uuid()]: {
+    name: "To Do",
+    items: itemsFromBackend,
+  },
+  [uuid()]: {
+    name: "Doing",
+    items: [],
+  },
+  [uuid()]: {
+    name: "Done",
+    items: [],
+  },
+  [uuid()]: {
+    name: "Trash",
+    items: [],
+  },
 };
 
-const App = () => {
-  const [tasks, setTasks] = useState(initialTasks);
-  const [newTask, setNewTask] = useState("");
+const onDragEnd = (result, columns, setColumns) => {
+  if (!result.destination) return;
+  const { source, destination } = result;
 
-  const handleAddTask = (e) => {
-    e.preventDefault();
-    if (!newTask) return;
-    const newId = Date.now();
-    const newTaskObj = { id: newId, title: newTask };
-    setTasks((prevTasks) => ({
-      ...prevTasks,
-      doing: [...prevTasks.doing, newTaskObj]
-    }));
-    setNewTask("");
-  };
+  if (source.droppableId !== destination.droppableId) {
+    const sourceColumn = columns[source.droppableId];
+    const destColumn = columns[destination.droppableId];
+    const sourceItems = [...sourceColumn.items];
+    const destItems = [...destColumn.items];
+    const [removed] = sourceItems.splice(source.index, 1);
+    destItems.splice(destination.index, 0, removed);
+    setColumns({
+      ...columns,
+      [source.droppableId]: {
+        ...sourceColumn,
+        items: sourceItems,
+      },
+      [destination.droppableId]: {
+        ...destColumn,
+        items: destItems,
+      },
+    });
+  } else {
+    const column = columns[source.droppableId];
+    const copiedItems = [...column.items];
+    const [removed] = copiedItems.splice(source.index, 1);
+    copiedItems.splice(destination.index, 0, removed);
+    setColumns({
+      ...columns,
+      [source.droppableId]: {
+        ...column,
+        items: copiedItems,
+      },
+    });
+  }
+};
 
-  const handleDeleteAll = () => {
-    setTasks((prevTasks) => ({ ...prevTasks, done: [] }));
-  };
+function App() {
+  const [columns, setColumns] = useState(columnsFromBackend);
 
-  const handleDragStart = (e, id) => {
-    e.dataTransfer.setData("taskId", id);
-  };
-
-  const handleDrop = (e, status) => {
-    const taskId = e.dataTransfer.getData("taskId");
-    const task = tasks.doing.find((task) => task.id === Number(taskId));
-    if (!task) return;
-    const newDoingTasks = tasks.doing.filter((task) => task.id !== Number(taskId));
-    const newDoneTasks = [...tasks.done, task];
-    setTasks({ doing: newDoingTasks, done: newDoneTasks });
-  };
+  const [newItem, setNewItem] = useState("");
 
   return (
-    <div className="app">
-      <h1 className="app__title">Kanban Board</h1>
-      <form className="app__form" onSubmit={handleAddTask}>
+    <>
+    <div style={{ display: "flex", justifyContent: "center", height: "100%" , marginTop:"40px"}}>
+    <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const newItemObject = {
+            id: uuid(),
+            content: newItem,
+          };
+          setColumns({
+            ...columns,
+            [Object.keys(columns)[0]]: {
+              ...columns[Object.keys(columns)[0]],
+              items: [...columns[Object.keys(columns)[0]].items, newItemObject],
+            },
+          });
+          setNewItem("");
+        }}
+      >
         <input
-          className="app__input"
           type="text"
-          value={newTask}
-          placeholder="Add new task"
-          onChange={(e) => setNewTask(e.target.value)}
+          value={newItem}
+          onChange={(e) => setNewItem(e.target.value)}
         />
-        <button className="app__button" type="submit">Add</button>
+        <button type="submit">Create</button>
       </form>
-      <div className="app__board">
-        <div className="app__column">
-          <h2 className="app__column-title">Doing</h2>
-          {tasks.doing.map((task) => (
-            <div
-              key={task.id}
-              className="app__task"
-              draggable
-              onDragStart={(e) => handleDragStart(e, task.id)}
-            >
-              {task.title}
-            </div>
-          ))}
-        </div>
-        <div
-          className="app__column"
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => handleDrop(e, "done")}
-        >
-          <h2 className="app__column-title">Done</h2>
-          {tasks.done.map((task) => (
-            <div key={task.id} className="app__task">
-              {task.title}
-            </div>
-          ))}
-          {tasks.done.length > 0 && (
-            <button className="app__delete-all" onClick={handleDeleteAll}>
-              Delete All
-            </button>
-          )}
-        </div>
-      </div>
     </div>
+      
+      <div
+        style={{ display: "flex", justifyContent: "center", height: "100%" }}
+      >
+        <DragDropContext
+          onDragEnd={(result) => onDragEnd(result, columns, setColumns)}
+        >
+          {Object.entries(columns).map(([columnId, column], index) => {
+            return (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                }}
+                key={columnId}
+              >
+                <div style={{backgroundColor: "orange", width: "100%", padding:"20px" , border:"2px solid white"}}>
+                <h2 >{column.name}</h2>
+                </div>
+                
+                <div style={{ margin: 8 }}>
+                  <Droppable droppableId={columnId} key={columnId}>
+                    {(provided, snapshot) => {
+                      return (
+                        <div
+                          {...provided.droppableProps}
+                          ref={provided.innerRef}
+                          style={{
+                            background: snapshot.isDraggingOver
+                              ? "lightblue"
+                              : "lightgrey",
+                            padding: 4,
+                            width: 250,
+                            minHeight: 500,
+                          }}
+                        >
+                          {column.items.map((item, index) => {
+                            return (
+                              <Draggable
+                                key={item.id}
+                                draggableId={item.id}
+                                index={index}
+                              >
+                                {(provided, snapshot) => {
+                                  return (
+                                    <div
+                                      ref={provided.innerRef}
+                                      {...provided.draggableProps}
+                                      {...provided.dragHandleProps}
+                                      style={{
+                                        userSelect: "none",
+                                        padding: 16,
+                                        margin: "0 0 8px 0",
+                                        minHeight: "50px",
+                                        backgroundColor: snapshot.isDragging
+                                          ? "#263B4A"
+                                          : "#456C86",
+                                        color: "white",
+                                        ...provided.draggableProps.style,
+                                      }}
+                                    >
+                                      {item.content}
+                                    </div>
+                                  );
+                                }}
+                              </Draggable>
+                            );
+                          })}
+                          {provided.placeholder}
+                        </div>
+                      );
+                    }}
+                  </Droppable>
+
+                  {column.name === "Trash" && (
+                    <button
+                    style={{background: 'orange', padding:"4px",width:"100%"}} 
+                      onClick={() => {
+                        setColumns({
+                          ...columns,
+                          [columnId]: {
+                            ...column,
+                            items: [],
+                          },
+                        });
+                      }}
+                    >
+                      Delete All
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </DragDropContext>
+      </div>
+    </>
   );
-};
+}
 
 export default App;
-
